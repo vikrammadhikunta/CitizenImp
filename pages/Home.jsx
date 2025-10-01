@@ -17,7 +17,7 @@ import Geolocation from 'react-native-geolocation-service';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';   // ✅ FIX: import useNavigation
 
-// .env must have: MAPBOX_TOKEN=pk.your_mapbox_key
+
 const MAPBOX_TOKEN =
   'pk.eyJ1IjoidmlrcmFtNzYiLCJhIjoiY20zd3BydDZhMTM0cTJqcjBmZW96Y2liMiJ9.scf_t3IAqpcmZDxbpXJC2Q';
 

@@ -34,7 +34,7 @@ android {
         }
         release {
             signingConfig signingConfigs.debug
-            minifyEnabled false // change to true if you want ProGuard enabled
+            minifyEnabled false
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
@@ -45,20 +45,17 @@ react {
 }
 
 dependencies {
-    // React Native (set by React Native Gradle plugin)
     implementation("com.facebook.react:react-android")
 
-    // JS Engine
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation "io.github.react-native-community:jsc-android:2026004.+"
     }
 
-    // Firebase BOM (managed version from rootProject.ext)
     implementation(platform("com.google.firebase:firebase-bom:${rootProject.ext['react-native'].versions.firebase.bom}"))
-
-    // Example Firebase dependencies (add the ones you need)
     implementation "com.google.firebase:firebase-analytics"
     implementation "com.google.firebase:firebase-messaging"
 }
+
+apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"   // ✅ add this here
