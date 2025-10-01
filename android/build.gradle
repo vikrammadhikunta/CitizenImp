@@ -12,10 +12,26 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("com.android.tools.build:gradle")
+        classpath("com.android.tools.build:gradle:8.6.1") // latest AGP for SDK 36
         classpath("com.facebook.react:react-native-gradle-plugin")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
+        classpath("com.google.gms:google-services:4.4.3")
     }
+}
+
+project.ext {
+    set("react-native", [
+        versions: [
+            android: [
+                minSdk    : 23,
+                targetSdk : 33,
+                compileSdk: 34,
+            ],
+            firebase: [
+                bom: "34.3.0"
+            ],
+        ],
+    ])
 }
 
 apply plugin: "com.facebook.react.rootproject"

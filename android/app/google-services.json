@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "160932699572",
+    "project_id": "com-frontend",
+    "storage_bucket": "com-frontend.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:160932699572:android:320bba9a3a19aa43c8e6e1",
+        "android_client_info": {
+          "package_name": "com.citizen"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "160932699572-8h0otf7t7h95q73bhd0pau4kllq58c37.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDzPbWjaCEzmZEYyXLGrU6w6L3XYr3DFFY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "160932699572-8h0otf7t7h95q73bhd0pau4kllq58c37.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
