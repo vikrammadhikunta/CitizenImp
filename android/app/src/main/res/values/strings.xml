@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Citizen</string>
+    <string name="mapbox_access_token">pk.eyJ1IjoidmlrcmFtNzYiLCJhIjoiY20zd3BydDZhMTM0cTJqcjBmZW96Y2liMiJ9.scf_t3IAqpcmZDxbpXJC2Q</string>
 </resources>

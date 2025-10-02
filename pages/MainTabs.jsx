@@ -6,7 +6,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import HomeScreen from './Home';
 import ChallanScreen from './Challan';
 import ProfileScreen from './Profile';
-// import RouteScreen from './Route';
+import RouteScreen from './RouteScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -44,7 +44,7 @@ export default function AppNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="RouteTabs" component={MainTabs} />
-      {/* <Stack.Screen name="RoutePage" component={RouteScreen} /> */}
+      <Stack.Screen name="RoutePage" component={RouteScreen} />
     </Stack.Navigator>
   );
 }
