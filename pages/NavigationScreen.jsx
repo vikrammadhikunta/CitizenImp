@@ -44,9 +44,14 @@ const NavigationScreen = ({ route, navigation }) => {
   const [progress, setProgress] = useState(0);
   const [locationPermission, setLocationPermission] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
+  const [trafficData, setTrafficData] = useState(null);
+  const [trafficCongestion, setTrafficCongestion] = useState(null);
+  const [originalRouteData, setOriginalRouteData] = useState(routeData);
+  const [lastTrafficUpdate, setLastTrafficUpdate] = useState(Date.now());
   
   const cameraRef = useRef();
   const locationSubscription = useRef(null);
+  const trafficUpdateInterval = useRef(null);
 
   // Request location permissions
   const requestLocationPermission = async () => {
@@ -74,6 +79,106 @@ const NavigationScreen = ({ route, navigation }) => {
     // iOS handles permissions through Info.plist
     setLocationPermission(true);
     return true;
+  };
+
+  // Fetch real-time traffic data
+  const fetchTrafficData = useCallback(async () => {
+    if (selectedProfile !== 'driving') return; // Traffic only relevant for driving
+    
+    try {
+      const [lon1, lat1] = currentLocation;
+      const [lon2, lat2] = coordinates.end;
+      
+      // Get traffic-aware route
+      const trafficUrl = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${lon1},${lat1};${lon2},${lat2}?geometries=geojson&access_token=${MAPBOX_TOKEN}&overview=full&annotations=congestion`;
+      
+      const response = await fetch(trafficUrl);
+      const data = await response.json();
+      
+      if (data.routes && data.routes.length > 0) {
+        const trafficRoute = data.routes[0];
+        
+        // Calculate traffic congestion level
+        const congestion = calculateCongestionLevel(trafficRoute);
+        setTrafficCongestion(congestion);
+        
+        // Update route if significant time difference
+        const timeDifference = Math.abs(trafficRoute.duration - originalRouteData.duration);
+        const timeDifferencePercent = (timeDifference / originalRouteData.duration) * 100;
+        
+        if (timeDifferencePercent > 10) { // If more than 10% time difference
+          setTimeRemaining(trafficRoute.duration);
+          setDistanceRemaining(trafficRoute.distance);
+          
+          Alert.alert(
+            'Route Updated',
+            `Traffic conditions changed. New ETA: ${formatDuration(trafficRoute.duration)}`,
+            [{ text: 'OK' }]
+          );
+        }
+        
+        setTrafficData(trafficRoute);
+        setLastTrafficUpdate(Date.now());
+      }
+    } catch (error) {
+      console.log('Traffic data fetch error:', error);
+    }
+  }, [currentLocation, coordinates, selectedProfile, originalRouteData]);
+
+  // Calculate traffic congestion level
+  const calculateCongestionLevel = (route) => {
+    if (!route.legs || !route.legs[0].annotation?.congestion) {
+      return 'unknown';
+    }
+    
+    const congestion = route.legs[0].annotation.congestion;
+    const congestionCounts = {};
+    
+    congestion.forEach(level => {
+      congestionCounts[level] = (congestionCounts[level] || 0) + 1;
+    });
+    
+    const totalSegments = congestion.length;
+    const severeCount = (congestionCounts['severe'] || 0) + (congestionCounts['heavy'] || 0);
+    const moderateCount = congestionCounts['moderate'] || 0;
+    
+    if (severeCount / totalSegments > 0.3) return 'heavy';
+    if (moderateCount / totalSegments > 0.4) return 'moderate';
+    if (severeCount > 0) return 'light';
+    return 'clear';
+  };
+
+  // Get traffic color based on congestion level
+  const getTrafficColor = (congestion) => {
+    switch (congestion) {
+      case 'heavy': return '#ff4444';
+      case 'moderate': return '#ffaa00';
+      case 'light': return '#ffd700';
+      case 'clear': return '#4ecdc4';
+      default: return '#4ecdc4';
+    }
+  };
+
+  // Get traffic icon
+  const getTrafficIcon = () => {
+    switch (trafficCongestion) {
+      case 'heavy': return 'traffic';
+      case 'moderate': return 'warning';
+      case 'light': return 'info';
+      case 'clear': return 'check-circle';
+      default: return 'help';
+    }
+  };
+
+  // Get traffic message
+  const getTrafficMessage = () => {
+    switch (trafficCongestion) {
+      case 'heavy': return 'Heavy Traffic';
+      case 'moderate': return 'Moderate Traffic';
+      case 'light': return 'Light Traffic';
+      case 'clear': return 'Clear Road';
+      default: return 'Checking Traffic...';
+    }
   };
 
   // Calculate distance between two coordinates in meters
@@ -120,9 +225,17 @@ const NavigationScreen = ({ route, navigation }) => {
       remainingRouteDistance += calculateDistance(routeCoords[i], routeCoords[i + 1]);
     }
 
-    // Calculate remaining time based on profile
+    // Calculate remaining time based on profile and traffic
     let averageSpeed = 5; // km/h default for walking
-    if (selectedProfile === 'driving') averageSpeed = 50;
+    if (selectedProfile === 'driving') {
+      // Adjust speed based on traffic
+      switch (trafficCongestion) {
+        case 'heavy': averageSpeed = 20; break;
+        case 'moderate': averageSpeed = 35; break;
+        case 'light': averageSpeed = 45; break;
+        default: averageSpeed = 50; // clear traffic
+      }
+    }
     if (selectedProfile === 'cycling') averageSpeed = 15;
 
     const remainingTime = (remainingRouteDistance / 1000) / averageSpeed * 3600; // in seconds
@@ -245,18 +358,23 @@ const NavigationScreen = ({ route, navigation }) => {
       };
 
       // Use the location manager's event system
-      // Note: The exact event name might vary based on Mapbox version
       locationSubscription.current = LocationManager.addListener(
         'LocationUpdate', 
         onLocationUpdate
       );
+
+      // Start traffic updates for driving mode
+      if (selectedProfile === 'driving') {
+        fetchTrafficData(); // Initial traffic data
+        trafficUpdateInterval.current = setInterval(fetchTrafficData, 30000); // Update every 30 seconds
+      }
 
     } catch (error) {
       console.error('Failed to start location tracking:', error);
       // Fallback to simulation
       startSimulatedNavigation();
     }
-  }, [routeData, coordinates, selectedProfile]);
+  }, [routeData, coordinates, selectedProfile, fetchTrafficData]);
 
   // Stop location tracking
   const stopLocationTracking = () => {
@@ -268,6 +386,10 @@ const NavigationScreen = ({ route, navigation }) => {
       
       if (LocationManager && typeof LocationManager.stop === 'function') {
         LocationManager.stop();
+      }
+      
+      if (trafficUpdateInterval.current) {
+        clearInterval(trafficUpdateInterval.current);
       }
     } catch (error) {
       console.warn('Error stopping location manager:', error);
@@ -316,6 +438,34 @@ const NavigationScreen = ({ route, navigation }) => {
         },
       ]
     );
+  };
+
+  const handleReroute = async () => {
+    try {
+      const [lon1, lat1] = currentLocation;
+      const [lon2, lat2] = coordinates.end;
+      
+      const rerouteUrl = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${lon1},${lat1};${lon2},${lat2}?geometries=geojson&access_token=${MAPBOX_TOKEN}&overview=full&alternatives=true`;
+      
+      const response = await fetch(rerouteUrl);
+      const data = await response.json();
+      
+      if (data.routes && data.routes.length > 1) {
+        // Find the fastest alternative route
+        const fastestRoute = data.routes.reduce((fastest, current) => 
+          current.duration < fastest.duration ? current : fastest
+        );
+        
+        setOriginalRouteData(fastestRoute);
+        setTimeRemaining(fastestRoute.duration);
+        setDistanceRemaining(fastestRoute.distance);
+        
+        Alert.alert('Rerouted', 'Found a faster route!');
+      }
+    } catch (error) {
+      console.log('Reroute error:', error);
+      Alert.alert('Reroute Failed', 'Could not find a better route');
+    }
   };
 
   const getRouteProgressLine = () => {
@@ -401,13 +551,13 @@ const NavigationScreen = ({ route, navigation }) => {
           </ShapeSource>
         )}
 
-        {/* Remaining route */}
+        {/* Remaining route - color based on traffic */}
         {getRouteProgressLine() && (
           <ShapeSource id="remainingRouteSource" shape={getRouteProgressLine()}>
             <LineLayer
               id="remainingRouteLine"
               style={{
-                lineColor: '#ff6b6b',
+                lineColor: selectedProfile === 'driving' ? getTrafficColor(trafficCongestion) : '#ff6b6b',
                 lineWidth: 6,
                 lineOpacity: 0.8,
                 lineDasharray: [2, 2],
@@ -485,6 +635,17 @@ const NavigationScreen = ({ route, navigation }) => {
         </View>
       </View>
 
+      {/* Traffic Info Banner */}
+      {selectedProfile === 'driving' && trafficCongestion && (
+        <View style={[styles.trafficBanner, { backgroundColor: getTrafficColor(trafficCongestion) }]}>
+          <MaterialIcons name={getTrafficIcon()} size={18} color="#fff" />
+          <Text style={styles.trafficText}>{getTrafficMessage()}</Text>
+          <TouchableOpacity onPress={handleReroute} style={styles.rerouteButton}>
+            <Text style={styles.rerouteText}>Reroute</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Navigation Info Panel */}
       <View style={styles.infoPanel}>
         <View style={styles.infoRow}>
@@ -513,7 +674,10 @@ const NavigationScreen = ({ route, navigation }) => {
             <View 
               style={[
                 styles.progressFill,
-                { width: `${progress * 100}%` }
+                { 
+                  width: `${progress * 100}%`,
+                  backgroundColor: selectedProfile === 'driving' ? getTrafficColor(trafficCongestion) : '#4ecdc4'
+                }
               ]} 
             />
           </View>
@@ -542,6 +706,16 @@ const NavigationScreen = ({ route, navigation }) => {
             <MaterialIcons name="my-location" size={20} color="#fff" />
             <Text style={styles.recenterButtonText}>Recenter</Text>
           </TouchableOpacity>
+
+          {selectedProfile === 'driving' && (
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.rerouteActionButton]}
+              onPress={handleReroute}
+            >
+              <MaterialIcons name="refresh" size={20} color="#fff" />
+              <Text style={styles.rerouteActionText}>Reroute</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -610,6 +784,37 @@ const styles = StyleSheet.create({
     color: '#666',
     marginLeft: 4,
   },
+  trafficBanner: {
+    position: 'absolute',
+    top: 120,
+    left: 20,
+    right: 20,
+    backgroundColor: '#ffaa00',
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    elevation: 8,
+  },
+  trafficText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+    marginLeft: 8,
+    flex: 1,
+  },
+  rerouteButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 8,
+  },
+  rerouteText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 12,
+  },
   infoPanel: {
     position: 'absolute',
     bottom: 20,
@@ -668,9 +873,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     borderRadius: 12,
-    flex: 0.48,
+    flex: 0.3,
   },
   stopButton: {
     backgroundColor: '#ff6b6b',
@@ -678,15 +883,26 @@ const styles = StyleSheet.create({
   recenterButton: {
     backgroundColor: '#4ecdc4',
   },
+  rerouteActionButton: {
+    backgroundColor: '#ffaa00',
+  },
   stopButtonText: {
     color: '#fff',
     fontWeight: '600',
     marginLeft: 6,
+    fontSize: 12,
   },
   recenterButtonText: {
     color: '#fff',
     fontWeight: '600',
     marginLeft: 6,
+    fontSize: 12,
+  },
+  rerouteActionText: {
+    color: '#fff',
+    fontWeight: '600',
+    marginLeft: 6,
+    fontSize: 12,
   },
   arrivalBanner: {
     position: 'absolute',
