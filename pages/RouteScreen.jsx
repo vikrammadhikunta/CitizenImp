@@ -1,4 +1,4 @@
-// RoutePage.js
+// RouteScreen.js
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -8,12 +8,21 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import Mapbox, { MapView, Camera, ShapeSource, LineLayer, PointAnnotation } from '@rnmapbox/maps';
+import Mapbox from '@rnmapbox/maps';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+
+// Use named imports
+const { MapView, Camera, ShapeSource, LineLayer, PointAnnotation } = Mapbox;
 
 // --- IMPORTANT ---
 const MAPBOX_TOKEN = 'pk.eyJ1IjoidmlrcmFtNzYiLCJhIjoiY20zd3BydDZhMTM0cTJqcjBmZW96Y2liMiJ9.scf_t3IAqpcmZDxbpXJC2Q';
-Mapbox.setAccessToken(MAPBOX_TOKEN);
+
+// Initialize Mapbox with error handling
+try {
+  Mapbox.setAccessToken(MAPBOX_TOKEN);
+} catch (error) {
+  console.warn('Mapbox initialization warning:', error);
+}
 
 // Cache for coordinates to avoid re-geocoding
 const coordinatesCache = new Map();
@@ -181,12 +190,28 @@ const RouteScreen = ({ route, navigation }) => {
     };
 
     getAllRoutes();
-
+  
     return () => {
       isMounted = false;
       abortController.abort();
     };
   }, [from, to, geocodeAddress, fetchRoute]);
+
+  const handleStartNavigation = () => {
+    const routeData = routes[selectedProfile];
+    
+    if (!routeData) {
+      Alert.alert('Error', 'Route data not available');
+      return;
+    }
+
+    // Navigate to NavigationScreen
+    navigation.navigate('NavigationScreen', {
+      routeData,
+      coordinates,
+      selectedProfile,
+    });
+  };
 
   // Memoized helper functions
   const formatDuration = useCallback((seconds) => {
@@ -242,7 +267,6 @@ const RouteScreen = ({ route, navigation }) => {
         >
           <View style={styles.marker}>
             <MaterialIcons name="location-pin" size={32} color="#4a90e2" />
-            <View style={[styles.pulse, styles.startPulse]} />
           </View>
         </PointAnnotation>
 
@@ -254,7 +278,6 @@ const RouteScreen = ({ route, navigation }) => {
         >
           <View style={styles.marker}>
             <MaterialIcons name="location-pin" size={32} color="#ff4444" />
-            <View style={[styles.pulse, styles.endPulse]} />
           </View>
         </PointAnnotation>
       </>
@@ -372,6 +395,7 @@ const RouteScreen = ({ route, navigation }) => {
               (!routes[selectedProfile] && styles.startButtonDisabled)
             ]}
             disabled={!routes[selectedProfile]}
+            onPress={handleStartNavigation}
           >
             <Text style={styles.startButtonText}>
               {routes[selectedProfile] ? 'Start Navigation' : 'Calculating Route...'}
@@ -515,18 +539,5 @@ const styles = StyleSheet.create({
   marker: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  pulse: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    borderRadius: 20,
-    opacity: 0.4,
-  },
-  startPulse: {
-    backgroundColor: '#4a90e2',
-  },
-  endPulse: {
-    backgroundColor: '#ff4444',
   },
 });

@@ -7,6 +7,8 @@ import HomeScreen from './Home';
 import ChallanScreen from './Challan';
 import ProfileScreen from './Profile';
 import RouteScreen from './RouteScreen';
+import NavigationScreen from './NavigationScreen';
+
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -45,6 +47,7 @@ export default function AppNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="RouteTabs" component={MainTabs} />
       <Stack.Screen name="RoutePage" component={RouteScreen} />
+      <Stack.Screen name="NavigationScreen" component={NavigationScreen} />
     </Stack.Navigator>
   );
 }
